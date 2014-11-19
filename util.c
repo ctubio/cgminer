@@ -37,6 +37,7 @@
 # include <ws2tcpip.h>
 # include <mmsystem.h>
 #endif
+#include <sched.h>
 
 #include "miner.h"
 #include "elist.h"
@@ -46,6 +47,13 @@
 #define DEFAULT_SOCKWAIT 60
 
 bool successful_connect = false;
+
+int no_yield(void)
+{
+	return 0;
+}
+
+int (*selective_yield)(void) = &no_yield;
 
 unsigned char bit_swap_table[256] =
 {
@@ -1648,6 +1656,24 @@ double tdiff(struct timeval *end, struct timeval *start)
 	return end->tv_sec - start->tv_sec + (end->tv_usec - start->tv_usec) / 1000000.0;
 }
 
+void check_extranonce_option(struct pool *pool, char * url)
+{
+	char extra_op[16],*extra_op_loc;
+	extra_op_loc = strstr(url,"#");
+    if(extra_op_loc && !pool->extranonce_subscribe)
+    {
+        strcpy(extra_op, extra_op_loc);
+        *extra_op_loc = '\0';
+		if(!strcmp(extra_op,"#xnsub"))
+		{
+			pool->extranonce_subscribe = true;
+			applog(LOG_DEBUG, "Extra nonce subscribing enabled.");
+			return;
+		}
+    }
+	return;
+}
+
 bool extract_sockaddr(char *url, char **sockaddr_url, char **sockaddr_port)
 {
 	char *url_begin, *url_end, *ipv6_begin, *ipv6_end, *port_start = NULL;
@@ -2148,6 +2174,40 @@ static bool parse_diff(struct pool *pool, json_t *val)
 	return true;
 }
 
+static bool parse_extranonce(struct pool *pool, json_t *val)
+{
+        int n2size;
+	char* nonce1;
+        
+        nonce1 = json_array_string(val, 0);
+        if (!valid_hex(nonce1)) {
+                applog(LOG_INFO, "Failed to get valid nonce1 in parse_extranonce");
+                goto out;
+        }
+        n2size = json_integer_value(json_array_get(val, 1));
+        if (n2size < 2 || n2size > 16) {
+                applog(LOG_INFO, "Failed to get valid n2size in parse_extranonce");
+                free(nonce1);
+                goto out;
+        }
+
+        cg_wlock(&pool->data_lock);
+        pool->nonce1 = nonce1;
+        pool->n1_len = strlen(nonce1) / 2;
+        free(pool->nonce1bin);
+        pool->nonce1bin = calloc(pool->n1_len, 1);
+        if (unlikely(!pool->nonce1bin))
+                quithere(1, "Failed to calloc pool->nonce1bin");
+        hex2bin(pool->nonce1bin, pool->nonce1, pool->n1_len);
+        pool->n2size = n2size;
+	applog(LOG_NOTICE, "Pool %d confirmed mining.extranonce.subscribe with extranonce1 %s extran2size %d",
+                               pool->pool_no, pool->nonce1, pool->n2size);
+        cg_wunlock(&pool->data_lock);
+	return true;
+out:
+	return false;
+}
+
 static void __suspend_stratum(struct pool *pool)
 {
 	clear_sockbuf(pool);
@@ -2216,13 +2276,32 @@ static bool parse_reconnect(struct pool *pool, json_t *val)
 
 static bool send_version(struct pool *pool, json_t *val)
 {
+	json_t *id_val = json_object_get(val, "id");
 	char s[RBUFSIZE];
-	int id = json_integer_value(json_object_get(val, "id"));
+	int id;
 	
-	if (!id)
+	if (!id_val)
 		return false;
+	id = json_integer_value(json_object_get(val, "id"));
 
 	sprintf(s, "{\"id\": %d, \"result\": \""PACKAGE"/"VERSION"\", \"error\": null}", id);
+	if (!stratum_send(pool, s, strlen(s)))
+		return false;
+
+	return true;
+}
+
+static bool send_pong(struct pool *pool, json_t *val)
+{
+	json_t *id_val = json_object_get(val, "id");
+	char s[RBUFSIZE];
+	int id;
+
+	if (!id_val)
+		return false;
+	id = json_integer_value(json_object_get(val, "id"));
+
+	sprintf(s, "{\"id\": %d, \"result\": \"pong\", \"error\": null}", id);
 	if (!stratum_send(pool, s, strlen(s)))
 		return false;
 
@@ -2289,6 +2368,12 @@ bool parse_method(struct pool *pool, char *s)
 		goto out_decref;
 	}
 
+		
+	if(!strncasecmp(buf, "mining.set_extranonce", 21)) {
+		ret = parse_extranonce(pool, params);
+		goto out_decref;
+	}
+
 	if (!strncasecmp(buf, "mining.set_difficulty", 21)) {
 		ret = parse_diff(pool, params);
 		goto out_decref;
@@ -2306,6 +2391,12 @@ bool parse_method(struct pool *pool, char *s)
 
 	if (!strncasecmp(buf, "client.show_message", 19)) {
 		ret = show_message(pool, params);
+		goto out_decref;
+	}
+
+	if (!strncasecmp(buf, "mining.ping", 11)) {
+		applog(LOG_INFO, "Pool %d ping", pool->pool_no);
+		ret = send_pong(pool, val);
 		goto out_decref;
 	}
 out_decref:
@@ -2898,6 +2989,11 @@ out:
 		if (opt_protocol) {
 			applog(LOG_DEBUG, "Pool %d confirmed mining.subscribe with extranonce1 %s extran2size %d",
 			       pool->pool_no, pool->nonce1, pool->n2size);
+		}
+		if(pool->extranonce_subscribe)
+		{
+			sprintf(s,"{\"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}", swork_id++);
+		    stratum_send(pool, s, strlen(s));
 		}
 	} else {
 		if (recvd && !noresume) {
