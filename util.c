@@ -1667,7 +1667,7 @@ void check_extranonce_option(struct pool *pool, char * url)
 		if(!strcmp(extra_op,"#xnsub"))
 		{
 			pool->extranonce_subscribe = true;
-			applog(LOG_DEBUG, "Extra nonce subscribing enabled.");
+			applog(LOG_DEBUG, "Pool %d extranonce subscribing enabled.",pool->pool_no);
 			return;
 		}
     }
@@ -2878,6 +2878,18 @@ void suspend_stratum(struct pool *pool)
 	mutex_unlock(&pool->stratum_lock);
 }
 
+void extranonce_subscribe_stratum(struct pool *pool)
+{
+	if(pool->extranonce_subscribe)
+        {
+			char s[RBUFSIZE];
+        	sprintf(s,"{\"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}", swork_id++);
+			applog(LOG_INFO, "Send extranonce.subscribe for stratum pool %d", pool->pool_no);
+            stratum_send(pool, s, strlen(s));
+        }
+}
+
+
 bool initiate_stratum(struct pool *pool)
 {
 	bool ret = false, recvd = false, noresume = false, sockd = false;
@@ -3030,6 +3042,7 @@ bool restart_stratum(struct pool *pool)
 		goto out;
 	if (!auth_stratum(pool))
 		goto out;
+	extranonce_subscribe_stratum(pool);
 	ret = true;
 out:
 	if (!ret)
