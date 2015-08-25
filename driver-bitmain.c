@@ -696,8 +696,8 @@ static int bitmain_set_rxstatus(struct bitmain_rxstatus_token *bm,
 	crc = CRC16((uint8_t *)bm, datalen-2);
 	bm->crc = htole16(crc);
 
-	applog(LOG_ERR, "BitMain RxStatus Token: v(%d) chip_status_eft(%d) detect_get(%d) chip_address(%02x) reg_address(%02x) crc(%04x)",
-				version, chip_status_eft, detect_get, chip_address, reg_address, crc);
+	//applog(LOG_ERR, "BitMain RxStatus Token: v(%d) chip_status_eft(%d) detect_get(%d) chip_address(%02x) reg_address(%02x) crc(%04x)",
+	//			version, chip_status_eft, detect_get, chip_address, reg_address, crc);
 
 	return datalen;
 }
@@ -810,7 +810,7 @@ static int bitmain_parse_rxstatus(const uint8_t * data, int datalen, struct bitm
 			bm->reserved1 = ((tmp << 4) & 0xff) >> 5;
 		}	
 		found_blocks = bm->get_blk_num;	
-		applog(LOG_ERR, "BitMain RxStatus tmp :0x%02x  byte4 0x%02x chip_value_eft %d reserved %d get_blk_num %d ",tmp,*((uint8_t* )bm +4),bm->chip_value_eft,bm->reserved1,bm->get_blk_num);
+		//applog(LOG_ERR, "BitMain RxStatus tmp :0x%02x  byte4 0x%02x chip_value_eft %d reserved %d get_blk_num %d ",tmp,*((uint8_t* )bm +4),bm->chip_value_eft,bm->reserved1,bm->get_blk_num);
 	}
 	applog(LOG_DEBUG, "BitMain RxStatusData: chipv_e(%d) chainnum(%d) fifos(%d) v1(%d) v2(%d) v3(%d) v4(%d) fann(%d) tempn(%d) fanet(%04x) tempet(%08x) ne(%d) regvalue(%d) crc(%04x)",
 			bm->chip_value_eft, bm->chain_num, bm->fifo_space, bm->hw_version[0], bm->hw_version[1], bm->hw_version[2], bm->hw_version[3], bm->fan_num, bm->temp_num, bm->fan_exist, bm->temp_exist, bm->nonce_error, bm->reg_value, bm->crc);
@@ -1163,9 +1163,9 @@ static void bitmain_parse_results(struct cgpu_info *bitmain, struct bitmain_info
 				info->nonce_error = rxstatusdata.nonce_error;
 				errordiff = info->nonce_error-info->last_nonce_error;
 				//sprintf(g_miner_version, "%d.%d.%d.%d", info->hw_version[0], info->hw_version[1], info->hw_version[2], info->hw_version[3]);
-				applog(LOG_ERR, "bitmain_parse_results v=%d chain=%d fifo=%d hwv1=%d hwv2=%d hwv3=%d hwv4=%d nerr=%d-%d freq=%d chain info:",
-						rxstatusdata.version, info->chain_num, info->fifo_space, info->hw_version[0], info->hw_version[1], info->hw_version[2], info->hw_version[3],
-						info->last_nonce_error, info->nonce_error, info->frequency);
+				//applog(LOG_ERR, "bitmain_parse_results v=%d chain=%d fifo=%d hwv1=%d hwv2=%d hwv3=%d hwv4=%d nerr=%d-%d freq=%d chain info:",
+				//		rxstatusdata.version, info->chain_num, info->fifo_space, info->hw_version[0], info->hw_version[1], info->hw_version[2], info->hw_version[3],
+				//		info->last_nonce_error, info->nonce_error, info->frequency);
 				memcpy(info->chain_asic_exist, rxstatusdata.chain_asic_exist, BITMAIN_MAX_CHAIN_NUM*32);
 				memcpy(info->chain_asic_status, rxstatusdata.chain_asic_status, BITMAIN_MAX_CHAIN_NUM*32);
 				for(n = 0; n < rxstatusdata.chain_num; n++) {
@@ -1209,11 +1209,11 @@ static void bitmain_parse_results(struct cgpu_info *bitmain, struct bitmain_info
 								mod = 0;
 						}
 					}
-					applog(LOG_DEBUG, "bitmain_parse_results chain(%d) asic_num=%d asic_exist=%08x%08x%08x%08x%08x%08x%08x%08x asic_status=%08x%08x%08x%08x%08x%08x%08x%08x",
-						n, info->chain_asic_num[n],
-						info->chain_asic_exist[n*8+0], info->chain_asic_exist[n*8+1], info->chain_asic_exist[n*8+2], info->chain_asic_exist[n*8+3], info->chain_asic_exist[n*8+4], info->chain_asic_exist[n*8+5], info->chain_asic_exist[n*8+6], info->chain_asic_exist[n*8+7],
-						info->chain_asic_status[n*8+0], info->chain_asic_status[n*8+1], info->chain_asic_status[n*8+2], info->chain_asic_status[n*8+3], info->chain_asic_status[n*8+4], info->chain_asic_status[n*8+5], info->chain_asic_status[n*8+6], info->chain_asic_status[n*8+7]);
-					applog(LOG_ERR, "bitmain_parse_results chain(%d) asic_num=%d asic_status=%s", n, info->chain_asic_num[n], info->chain_asic_status_t[n]);
+					//applog(LOG_DEBUG, "bitmain_parse_results chain(%d) asic_num=%d asic_exist=%08x%08x%08x%08x%08x%08x%08x%08x asic_status=%08x%08x%08x%08x%08x%08x%08x%08x",
+					//	n, info->chain_asic_num[n],
+					//	info->chain_asic_exist[n*8+0], info->chain_asic_exist[n*8+1], info->chain_asic_exist[n*8+2], info->chain_asic_exist[n*8+3], info->chain_asic_exist[n*8+4], info->chain_asic_exist[n*8+5], info->chain_asic_exist[n*8+6], info->chain_asic_exist[n*8+7],
+					//	info->chain_asic_status[n*8+0], info->chain_asic_status[n*8+1], info->chain_asic_status[n*8+2], info->chain_asic_status[n*8+3], info->chain_asic_status[n*8+4], info->chain_asic_status[n*8+5], info->chain_asic_status[n*8+6], info->chain_asic_status[n*8+7]);
+					//applog(LOG_ERR, "bitmain_parse_results chain(%d) asic_num=%d asic_status=%s", n, info->chain_asic_num[n], info->chain_asic_status_t[n]);
 				}
 				mutex_unlock(&info->qlock);
 
